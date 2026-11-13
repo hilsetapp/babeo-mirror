@@ -14,9 +14,9 @@
     <meta name="theme-color" content="#080A11" />
     <link rel="canonical" href="https://babeo-app.ru" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Unbounded:wght@500;600;700&display=swap" rel="stylesheet" />
+    
+    
+    
     
     <style>/* cyrillic */
 @font-face {
@@ -194,7 +194,29 @@
   </head>
   <body class="bg-[#080A11] text-[#F5F6FA] antialiased overflow-x-hidden selection:bg-[#6366F1]/30 selection:text-white">
     <div id="root"></div>
-  <script type="module">(function(){const t=document.createElement("link").relList;if(t&&t.supports&&t.supports("modulepreload"))return;for(const s of document.querySelectorAll('link[rel="modulepreload"]'))r(s);new MutationObserver(s=>{for(const i of s)if(i.type==="childList")for(const o of i.addedNodes)o.tagName==="LINK"&&o.rel==="modulepreload"&&r(o)}).observe(document,{childList:!0,subtree:!0});function n(s){const i={};return s.integrity&&(i.integrity=s.integrity),s.referrerPolicy&&(i.referrerPolicy=s.referrerPolicy),s.crossOrigin==="use-credentials"?i.credentials="include":s.crossOrigin==="anonymous"?i.credentials="omit":i.credentials="same-origin",i}function r(s){if(s.ep)return;s.ep=!0;const i=n(s);fetch(s.href,i)}})();function lp(e){return e&&e.__esModule&&Object.prototype.hasOwnProperty.call(e,"default")?e.default:e}var Nc={exports:{}},Mi={},jc={exports:{}},ve={};/**
+  <script>
+  // Статическая версия держит фото рядом с собой. Перехватываем адреса
+  // ещё до загрузки, чтобы картинки из сохранённых данных открывались.
+  (function () {
+    var toLocal = function (v) {
+      return typeof v === 'string' && v.indexOf('/api/assets/') === 0 ? '.' + v : v;
+    };
+    var desc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+    if (desc && desc.set) {
+      Object.defineProperty(HTMLImageElement.prototype, 'src', {
+        configurable: true,
+        get: function () { return desc.get.call(this); },
+        set: function (v) { desc.set.call(this, toLocal(v)); },
+      });
+    }
+    var setAttr = Element.prototype.setAttribute;
+    Element.prototype.setAttribute = function (name, value) {
+      if (name === 'src' && this.tagName === 'IMG') value = toLocal(value);
+      return setAttr.call(this, name, value);
+    };
+  })();
+</script>
+<script type="module">(function(){const t=document.createElement("link").relList;if(t&&t.supports&&t.supports("modulepreload"))return;for(const s of document.querySelectorAll('link[rel="modulepreload"]'))r(s);new MutationObserver(s=>{for(const i of s)if(i.type==="childList")for(const o of i.addedNodes)o.tagName==="LINK"&&o.rel==="modulepreload"&&r(o)}).observe(document,{childList:!0,subtree:!0});function n(s){const i={};return s.integrity&&(i.integrity=s.integrity),s.referrerPolicy&&(i.referrerPolicy=s.referrerPolicy),s.crossOrigin==="use-credentials"?i.credentials="include":s.crossOrigin==="anonymous"?i.credentials="omit":i.credentials="same-origin",i}function r(s){if(s.ep)return;s.ep=!0;const i=n(s);fetch(s.href,i)}})();function lp(e){return e&&e.__esModule&&Object.prototype.hasOwnProperty.call(e,"default")?e.default:e}var Nc={exports:{}},Mi={},jc={exports:{}},ve={};/**
  * @license React
  * react.production.min.js
  *
