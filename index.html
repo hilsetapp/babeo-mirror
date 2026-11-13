@@ -199,7 +199,9 @@
   // ещё до загрузки, чтобы картинки из сохранённых данных открывались.
   (function () {
     var toLocal = function (v) {
-      return typeof v === 'string' && v.indexOf('/api/assets/') === 0 ? '.' + v : v;
+      return typeof v === 'string' && v.indexOf('/api/assets/') === 0
+        ? './assets/' + v.slice('/api/assets/'.length)
+        : v;
     };
     var desc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
     if (desc && desc.set) {
