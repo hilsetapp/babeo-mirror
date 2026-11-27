@@ -86,18 +86,27 @@
   SIZES.forEach(function (kb) {
     QUEUE.push({ src: 'https://babeo-app.ru/api/probe?kb=' + kb + '&p=' + Date.now(), id: 'ru-' + kb, label: 'Ваш домен: ' + kb + ' КБ' });
   });
-  function startPhotos() {
-    var PHOTOS = [
-      ['SONY_XM5', 'Фото товара (10 КБ)'],
-      ['ICON_512', 'Иконка сайта (36 КБ)'],
-      ['HERO_VILLAGE', 'Крупное фото (141 КБ)']
-    ];
-    PHOTOS.forEach(function (item) {
-      QUEUE.push({ src: 'https://babeo-app.ru/api/assets/' + item[0] + '.webp?p=' + Date.now(), id: 'photo-' + item[0], label: item[1] });
-    });
+  [['SONY_XM5', 'Фото товара (10 КБ)'], ['ICON_512', 'Иконка сайта (36 КБ)'], ['HERO_VILLAGE', 'Крупное фото (141 КБ)']].forEach(function (item) {
+    QUEUE.push({ src: 'https://babeo-app.ru/api/assets/' + item[0] + '.webp?p=' + Date.now(), id: 'photo-' + item[0], label: item[1] });
+  });
+
+  var expected = QUEUE.length + 1; // замеры плюс проверка самой страницы
+  var doneCount = 0;
+  var reportBuilt = false;
+
+  function maybeReport() {
+    doneCount++;
+    if (doneCount >= expected) buildReport();
   }
 
-  // проверка самой страницы сайта: ответ сервера и полная загрузка целиком
+  // по одному, чтобы на нестабильном канале загрузки не мешали друг другу
+  var qi = 0;
+  function next() {
+    if (qi >= QUEUE.length) return;
+    var t = QUEUE[qi++];
+    probe(t.src, t.id, t.label, next);
+  }
+
   function probePage() {
     var started = Date.now();
     var finished = false;
@@ -106,7 +115,7 @@
       finished = true;
       results['page'] = { ok: false, ms: Date.now() - started };
       update('page', 'обрыв, страница не ответила за 20 с', 'bad');
-      maybeReport(); startPhotos();
+      maybeReport(); next();
     }, 20000);
     fetch('https://babeo-app.ru/?probe=' + Date.now(), { mode: 'no-cors', cache: 'no-store' })
       .then(function () {
@@ -115,7 +124,7 @@
         var ms = Date.now() - started;
         results['page'] = { ok: true, ms: ms };
         update('page', 'сервер ответил за ' + ms + ' мс', 'ok');
-        maybeReport(); startPhotos();
+        maybeReport(); next();
       })
       .catch(function () {
         if (finished) return;
@@ -123,43 +132,12 @@
         var ms = Date.now() - started;
         results['page'] = { ok: false, ms: ms };
         update('page', 'соединение не установлено', 'bad');
-        maybeReport(); startPhotos();
+        maybeReport(); next();
       });
   }
+
   cell('page', 'Главная страница сайта', 'запрашиваю…', '');
-
-  // запускаем по одному: на нестабильном канале параллельные загрузки
-  // мешают друг другу и дают ложные обрывы
-  var qi = 0;
-  function next() {
-    if (qi >= QUEUE.length) { expected = 1 + QUEUE.length; if (doneCount >= expected) buildReport(); return; }
-    var t = QUEUE[qi++];
-    probe(t.src, t.id, t.label, next);
-  }
-
-  var expected = 1;
-  window.__queueAdded = false;
-  var doneCount = 0;
-  var reportBuilt = false;
-
   probePage();
-
-  function maybeReport() {
-    doneCount++;
-    expected = 1 + QUEUE.length;
-    if (doneCount >= expected) buildReport();
-  }
-
-  function threshold(prefix) {
-    var lastOk = 0, firstBad = null;
-    SIZES.forEach(function (kb) {
-      var r = results[prefix + '-' + kb];
-      if (!r) return;
-      if (r.ok) lastOk = Math.max(lastOk, kb);
-      else if (firstBad === null) firstBad = kb;
-    });
-    return { lastOk: lastOk, firstBad: firstBad };
-  }
 
   function buildReport() {
     if (reportBuilt) return;
