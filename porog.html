@@ -85,10 +85,17 @@
   SIZES.forEach(function (kb) {
     probe('https://babeo-app.ru/api/probe?kb=' + kb + '&p=' + Date.now(), 'ru-' + kb, 'Ваш домен: ' + kb + ' КБ');
   });
-  // отдельно проверяем, приходит ли крупное фото целиком
-  probe('https://babeo-app.ru/api/assets/HERO_VILLAGE.webp?p=' + Date.now(), 'photo', 'Крупное фото 141 КБ');
+  // отдельно проверяем реальные фото с сайта: именно они не открывались
+  var PHOTOS = [
+    ['SONY_XM5', 'Фото товара (10 КБ)'],
+    ['ICON_512', 'Иконка сайта (36 КБ)'],
+    ['HERO_VILLAGE', 'Крупное фото (141 КБ)'],
+  ];
+  PHOTOS.forEach(function (item) {
+    probe('https://babeo-app.ru/api/assets/' + item[0] + '.webp?p=' + Date.now(), 'photo-' + item[0], item[1]);
+  });
 
-  var expected = SIZES.length * 2 + 1;
+  var expected = SIZES.length * 2 + 3;
   var doneCount = 0;
   var reportBuilt = false;
 
