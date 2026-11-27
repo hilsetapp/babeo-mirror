@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Какие хостинги у вас открываются</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; background:#0B0F1F; color:#F5F6FA; font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; padding:16px 14px 40px; }
+  h1 { font-size:18px; margin:0 0 6px; }
+  .lead { color:#A9B2CC; font-size:13px; margin:0 0 16px; }
+  .row { display:flex; gap:10px; align-items:center; padding:11px 13px; border-radius:12px; background:#141A2E; border:1px solid rgba(255,255,255,.08); margin-bottom:8px; }
+  .mark { width:22px; flex:0 0 22px; text-align:center; font-weight:700; }
+  .ok { color:#34D399; } .bad { color:#F87171; } .wait { color:#FBBF24; }
+  .name { font-weight:600; font-size:14px; }
+  .info { font-size:12px; color:#A9B2CC; }
+  .copy { margin-top:14px; padding:12px; border-radius:10px; background:#000; border:1px solid rgba(255,255,255,.15); font:12px/1.45 ui-monospace,Menlo,Consolas,monospace; white-space:pre-wrap; word-break:break-all; color:#93C5FD; }
+  button { margin-top:12px; width:100%; padding:14px; border-radius:12px; border:0; background:#4F46E5; color:#fff; font-size:15px; font-weight:700; }
+  .hint { margin-top:16px; padding:13px; border-radius:12px; background:#101728; border:1px solid rgba(255,255,255,.08); font-size:13px; color:#C9D1E6; }
+</style>
+</head>
+<body>
+<h1>Какие хостинги у вас открываются</h1>
+<p class="lead">Здесь проверяются картинки с разных серверов. Картинки не подчиняются правилам, которые мешали прошлой проверке, поэтому результат будет честным.</p>
+<div id="rows"></div>
+<div class="hint">Через 15 секунд нажмите кнопку и пришлите строку отчёта.</div>
+<button onclick="copyReport()">Скопировать отчёт</button>
+<div class="copy" id="report">проверка идёт…</div>
+
+<script>
+(function () {
+  // каждый пункт: картинка с конкретного хостинга
+  var TESTS = [
+    { id:'vercel',  name:'Vercel (там сейчас сайт)', url:'https://babeo-app-hilset.vercel.app/api/assets/SONY_XM5.webp?p=' + Date.now() },
+    { id:'domain',  name:'Ваш домен babeo-app.ru',   url:'https://babeo-app.ru/api/assets/SONY_XM5.webp?p=' + Date.now() },
+    { id:'github',  name:'GitHub (эта страница)',    url:'https://hilsetapp.github.io/babeo-mirror/assets/' + 'DYSON_AIRWRAP.jpg' + '?p=' + Date.now() },
+    { id:'cf',      name:'Cloudflare',               url:'https://www.cloudflare.com/favicon.ico?p=' + Date.now() },
+    { id:'netlify', name:'Netlify',                  url:'https://www.netlify.com/favicon.ico?p=' + Date.now() },
+    { id:'jsdelivr',name:'jsDelivr (быстрая сеть)',  url:'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/favicon.ico?p=' + Date.now() },
+    { id:'yandex',  name:'Яндекс',                   url:'https://yandex.ru/favicon.ico?p=' + Date.now() },
+    { id:'google',  name:'Google',                   url:'https://www.google.com/favicon.ico?p=' + Date.now() },
+    { id:'tg',      name:'Telegram',                 url:'https://telegram.org/favicon.ico?p=' + Date.now() }
+  ];
+
+  var results = {}, settled = 0;
+
+  function setResult(id, ok, detail, ms) {
+    var mark = document.getElementById('mark-' + id);
+    if (!mark) return;
+    mark.textContent = ok ? '✓' : '✕';
+    mark.className = 'mark ' + (ok ? 'ok' : 'bad');
+    var info = document.getElementById('info-' + id);
+    if (info) info.textContent = detail + (ms ? ' (' + ms + ' мс)' : '');
+    if (!results[id]) { results[id] = { ok: ok, detail: detail, ms: ms }; settled++; }
+    if (settled === TESTS.length) buildReport();
+  }
+
+  function run(t) {
+    var wrap = document.createElement('div');
+    wrap.className = 'row';
+    wrap.innerHTML = '<div class="mark wait" id="mark-' + t.id + '">…</div><div><div class="name">' + t.name + '</div><div class="info" id="info-' + t.id + '">проверяю</div></div>';
+    document.getElementById('rows').appendChild(wrap);
+
+    var started = Date.now();
+    var img = new Image();
+    var finished = false;
+    var timer = setTimeout(function () {
+      if (finished) return;
+      finished = true;
+      setResult(t.id, false, 'нет ответа за 15 секунд', Date.now() - started);
+    }, 15000);
+    img.onload = function () {
+      if (finished) return; finished = true; clearTimeout(timer);
+      setResult(t.id, true, 'открывается', Date.now() - started);
+    };
+    img.onerror = function () {
+      if (finished) return; finished = true; clearTimeout(timer);
+      var ms = Date.now() - started;
+      setResult(t.id, false, ms < 1500 ? 'отказ за доли секунды, обычно это блокировка' : 'сервер не ответил', ms);
+    };
+    img.src = t.url;
+  }
+
+  TESTS.forEach(run);
+
+  function buildReport() {
+    var lines = ['Babeo, какие хостинги открываются', 'устройство: ' + navigator.userAgent, 'время: ' + new Date().toISOString()];
+    TESTS.forEach(function (t) {
+      var r = results[t.id];
+      lines.push((r && r.ok ? 'ОК  ' : 'НЕТ ') + t.name + ' -> ' + (r ? r.detail : 'нет данных'));
+    });
+    var good = TESTS.filter(function (t) { return results[t.id] && results[t.id].ok; }).map(function (t) { return t.name; });
+    lines.push('открываются: ' + (good.join(', ') || 'ничего'));
+    document.getElementById('report').textContent = lines.join('\n');
+  }
+
+  window.copyReport = function () {
+    var text = document.getElementById('report').textContent;
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text);
+    else { var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+    var btn = document.querySelector('button');
+    if (btn) btn.textContent = 'Отчёт скопирован';
+  };
+})();
+</script>
+</body>
+</html>
