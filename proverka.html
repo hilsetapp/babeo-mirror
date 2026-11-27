@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Проверка соединения с Babeo</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; background:#0B0F1F; color:#F5F6FA; font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; padding:16px 14px 40px; }
+  h1 { font-size:19px; margin:0 0 6px; }
+  .lead { color:#A9B2CC; font-size:13px; margin:0 0 16px; }
+  .row { display:flex; align-items:flex-start; gap:10px; padding:12px 14px; border-radius:12px; background:#141A2E; border:1px solid rgba(255,255,255,.08); margin-bottom:10px; }
+  .mark { width:22px; flex:0 0 22px; text-align:center; font-weight:700; }
+  .ok { color:#34D399; }
+  .bad { color:#F87171; }
+  .wait { color:#FBBF24; }
+  .name { font-weight:600; font-size:14px; }
+  .info { font-size:12.5px; color:#A9B2CC; word-break:break-word; }
+  .hint { margin-top:18px; padding:14px; border-radius:12px; background:#101728; border:1px solid rgba(255,255,255,.08); font-size:13px; color:#C9D1E6; }
+  .hint b { color:#fff; }
+  .copy { margin-top:14px; padding:12px; border-radius:10px; background:#000; border:1px solid rgba(255,255,255,.15); font:12px/1.45 ui-monospace,Menlo,Consolas,monospace; white-space:pre-wrap; word-break:break-all; color:#93C5FD; }
+  button { margin-top:12px; width:100%; padding:13px; border-radius:12px; border:0; background:#4F46E5; color:#fff; font-size:15px; font-weight:700; }
+  .sum { margin:16px 0 4px; padding:12px 14px; border-radius:12px; font-size:14px; font-weight:600; }
+  .sum.good { background:rgba(16,185,129,.14); border:1px solid rgba(16,185,129,.4); color:#6EE7B7; }
+  .sum.bad { background:rgba(248,113,113,.12); border:1px solid rgba(248,113,113,.4); color:#FCA5A5; }
+</style>
+</head>
+<body>
+<h1>Проверка соединения с Babeo</h1>
+<p class="lead">Эта страница живёт в другом месте, не на серверах вашего сайта. Она покажет, что именно не проходит с вашего устройства.</p>
+
+<div id="rows"></div>
+<div id="summary"></div>
+
+<div class="hint">
+  <b>Что делать с результатом:</b><br />
+  Пришлите эту строку как есть. По ней видно, рвётся ли соединение на домене, на сети доставки или вообще на уровне интернета.
+  <button onclick="copyReport()">Скопировать отчёт</button>
+</div>
+<div class="copy" id="report">проверка идёт…</div>
+
+<script>
+(function () {
+  var TESTS = [
+    { id: 'ru', name: 'Ваш домен babeo-app.ru', url: 'https://babeo-app.ru/?diag=1', type: 'text', need: 'Babeo' },
+    { id: 'asset', name: 'Картинка товара с вашего домена', url: 'https://babeo-app.ru/api/assets/SONY_XM5.webp?diag=1', type: 'blob' },
+    { id: 'vercel', name: 'Служебный адрес сайта на Vercel', url: 'https://babeo-app-hilset.vercel.app/?diag=1', type: 'text', need: 'Babeo' },
+    { id: 'ru-alt', name: 'Второй ваш домен babeo-app.online', url: 'https://babeo-app.online/?diag=1', type: 'text', need: 'Babeo' },
+    { id: 'tg', name: 'Серверы Telegram', url: 'https://api.telegram.org/bot9196539541:AAHt5maUdi3CQKb4VHfbSReEXgiaYuTmk1w/getMe', type: 'json' },
+    { id: 'google', name: 'Интернет вообще (Google)', url: 'https://www.google.com/generate_204', type: 'any' },
+    { id: 'cf', name: 'Сеть доставки Cloudflare', url: 'https://cloudflare.com/cdn-cgi/trace', type: 'text', need: 'fl=' }
+  ];
+
+  var results = {};
+  var done = 0;
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text) e.textContent = text;
+    return e;
+  }
+
+  function row(id, name) {
+    var wrap = el('div', 'row');
+    wrap.id = 'row-' + id;
+    var mark = el('div', 'mark wait', '…');
+    mark.id = 'mark-' + id;
+    var box = el('div');
+    box.appendChild(el('div', 'name', name));
+    var info = el('div', 'info', 'проверяю');
+    info.id = 'info-' + id;
+    box.appendChild(info);
+    wrap.appendChild(mark);
+    wrap.appendChild(box);
+    document.getElementById('rows').appendChild(wrap);
+  }
+
+  function setResult(id, ok, text, timeMs) {
+    var mark = document.getElementById('mark-' + id);
+    var info = document.getElementById('info-' + id);
+    mark.textContent = ok ? '✓' : '✕';
+    mark.className = 'mark ' + (ok ? 'ok' : 'bad');
+    info.textContent = text + (timeMs ? ' (' + timeMs + ' мс)' : '');
+    results[id] = { ok: ok, text: text, ms: timeMs };
+    done++;
+    if (done === TESTS.length) summarize();
+  }
+
+  function run(t) {
+    row(t.id, t.name);
+    var started = Date.now();
+    var ctrl = new AbortController();
+    var timer = setTimeout(function () { ctrl.abort(); }, 12000);
+    fetch(t.url, { cache: 'no-store', mode: 'cors', signal: ctrl.signal })
+      .then(function (res) {
+        clearTimeout(timer);
+        var ms = Date.now() - started;
+        if (!res.ok) { setResult(t.id, false, 'ответ сервера с ошибкой ' + res.status, ms); return; }
+        if (t.type === 'json' || t.type === 'blob' || t.type === 'any') {
+          setResult(t.id, true, 'соединение есть, ответ ' + res.status, ms); return;
+        }
+        return res.text().then(function (body) {
+          var good = !t.need || body.indexOf(t.need) > -1;
+          setResult(t.id, good, good ? 'страница пришла полностью' : 'страница пришла, но содержимое чужое', ms);
+        });
+      })
+      .catch(function (err) {
+        clearTimeout(timer);
+        var ms = Date.now() - started;
+        var msg = String(err && err.name);
+        var human = msg === 'AbortError'
+          ? 'нет ответа за 12 секунд'
+          : 'соединение не установлено (возможно, заблокировано)';
+        setResult(t.id, false, human, ms);
+      });
+  }
+
+  TESTS.forEach(run);
+
+  function summarize() {
+    var our = ['ru', 'asset', 'vercel', 'ru-alt'];
+    var oursOk = our.filter(function (k) { return results[k] && results[k].ok; }).length;
+    var netOk = results.google && results.google.ok;
+    var box = document.getElementById('summary');
+    box.className = 'sum ' + (oursOk >= 2 ? 'good' : 'bad');
+    if (oursOk >= 2) {
+      box.textContent = 'Ваш домен с этого устройства открывается. Значит блокировки нет, дело в конкретном приложении или кэше.';
+    } else if (netOk) {
+      box.textContent = 'Интернет работает, но ни один адрес вашего сайта не открылся. Это похоже на блокировку канала до серверов сайта или на фильтр у оператора.';
+    } else {
+      box.textContent = 'Не открывается даже проверочный адрес крупного сервиса. Похоже, интернет на устройстве работает не полностью: включён режим экономии, VPN или фильтр.';
+    }
+
+    var lines = [];
+    lines.push('Babeo, проверка соединения');
+    lines.push('устройство: ' + (navigator.userAgent || ''));
+    lines.push('время: ' + new Date().toISOString());
+    TESTS.forEach(function (t) {
+      var r = results[t.id];
+      lines.push((r && r.ok ? 'ОК  ' : 'НЕТ ') + t.name + ' -> ' + (r ? r.text : 'нет данных') + (r && r.ms ? ', ' + r.ms + ' мс' : ''));
+    });
+    document.getElementById('report').textContent = lines.join('\n');
+  }
+
+  window.copyReport = function () {
+    var text = document.getElementById('report').textContent;
+    if (navigator.clipboard) navigator.clipboard.writeText(text);
+    else {
+      var ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+    }
+    document.getElementById('report').textContent = text;
+  };
+})();
+</script>
+</body>
+</html>
