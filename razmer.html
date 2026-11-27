@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Какие фото с сайта открываются</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; background:#0B0F1F; color:#F5F6FA; font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; padding:16px 14px 40px; }
+  h1 { font-size:18px; margin:0 0 6px; }
+  .lead { color:#A9B2CC; font-size:13px; margin:0 0 14px; }
+  .row { display:flex; gap:10px; align-items:center; padding:11px 13px; border-radius:12px; background:#141A2E; border:1px solid rgba(255,255,255,.08); margin-bottom:8px; }
+  .mark { width:22px; flex:0 0 22px; text-align:center; font-weight:700; }
+  .ok { color:#34D399; } .bad { color:#F87171; } .wait { color:#FBBF24; }
+  .name { font-weight:600; font-size:14px; }
+  .info { font-size:12px; color:#A9B2CC; }
+  .copy { margin-top:14px; padding:12px; border-radius:10px; background:#000; border:1px solid rgba(255,255,255,.15); font:12px/1.45 ui-monospace,Menlo,Consolas,monospace; white-space:pre-wrap; word-break:break-all; color:#93C5FD; }
+  button { margin-top:12px; width:100%; padding:14px; border-radius:12px; border:0; background:#4F46E5; color:#fff; font-size:15px; font-weight:700; }
+  .hint { margin-top:16px; padding:13px; border-radius:12px; background:#101728; border:1px solid rgba(255,255,255,.08); font-size:13px; color:#C9D1E6; }
+</style>
+</head>
+<body>
+<h1>Какие фото с сайта открываются</h1>
+<p class="lead">Проверяются настоящие фотографии с вашего сайта, от маленькой к большой. Заодно два файла с постороннего сервера для сравнения.</p>
+<div id="rows"></div>
+<div class="hint">Через 20 секунд нажмите кнопку и пришлите строку отчёта.</div>
+<button onclick="copyReport()">Скопировать отчёт</button>
+<div class="copy" id="report">проверка идёт…</div>
+
+<script>
+(function () {
+  var TESTS = [
+    { id:'i2',   name:'Иконка 2 КБ',        kind:'img', url:'https://babeo-app.ru/icon-192.png?v=' + Date.now() },
+    { id:'s10',  name:'Фото наушников 10 КБ', kind:'img', url:'https://babeo-app.ru/api/assets/SONY_XM5.webp?v=' + Date.now() },
+    { id:'n11',  name:'Фото кроссовок 11 КБ', kind:'img', url:'https://babeo-app.ru/api/assets/NIKE_VOMERO.webp?v=' + Date.now() },
+    { id:'k27',  name:'Фото кофе 27 КБ',    kind:'img', url:'https://babeo-app.ru/api/assets/DRIP_COFFEE.webp?v=' + Date.now() },
+    { id:'i36',  name:'Иконка сайта 36 КБ', kind:'img', url:'https://babeo-app.ru/icon.png?v=' + Date.now() },
+    { id:'k71',  name:'Фото свитера 71 КБ', kind:'img', url:'https://babeo-app.ru/api/assets/KNIT_SWEATER.webp?v=' + Date.now() },
+    { id:'h141', name:'Крупное фото 141 КБ', kind:'img', url:'https://babeo-app.ru/api/assets/HERO_VILLAGE.webp?v=' + Date.now() },
+    { id:'p140', name:'Проверочный файл 140 КБ', kind:'fetch', url:'https://babeo-app.ru/api/probe?kb=140&v=' + Date.now() },
+    { id:'gh',   name:'GitHub (эта страница)', kind:'img', url:'https://hilsetapp.github.io/babeo-mirror/assets/DYSON_AIRWRAP.jpg?v=' + Date.now() }
+  ];
+
+  var results = {}, settled = 0, reported = false;
+
+  function setResult(id, ok, text) {
+    if (results[id]) return;
+    results[id] = { ok: ok, text: text };
+    var mark = document.getElementById('mark-' + id);
+    var info = document.getElementById('info-' + id);
+    if (mark) { mark.textContent = ok ? '✓' : '✕'; mark.className = 'mark ' + (ok ? 'ok' : 'bad'); }
+    if (info) info.textContent = text;
+    settled++;
+    if (settled === TESTS.length) buildReport();
+  }
+
+  function run(t) {
+    var wrap = document.createElement('div');
+    wrap.className = 'row';
+    wrap.innerHTML = '<div class="mark wait" id="mark-' + t.id + '">…</div><div><div class="name">' + t.name + '</div><div class="info" id="info-' + t.id + '">проверяю</div></div>';
+    document.getElementById('rows').appendChild(wrap);
+
+    var started = Date.now();
+    var done = false;
+    var timer = setTimeout(function () {
+      if (done) return; done = true;
+      setResult(t.id, false, 'нет ответа за 20 секунд');
+    }, 20000);
+
+    if (t.kind === 'img') {
+      var img = new Image();
+      img.onload = function () { if (done) return; done = true; clearTimeout(timer); setResult(t.id, true, 'открылось за ' + (Date.now() - started) + ' мс'); };
+      img.onerror = function () {
+        if (done) return; done = true; clearTimeout(timer);
+        var ms = Date.now() - started;
+        setResult(t.id, false, ms < 2000 ? 'отказ за ' + ms + ' мс' : 'обрыв после ' + ms + ' мс');
+      };
+      img.src = t.url;
+    } else {
+      fetch(t.url, { cache: 'no-store' })
+        .then(function (r) { return r.arrayBuffer(); })
+        .then(function (b) {
+          if (done) return; done = true; clearTimeout(timer);
+          setResult(t.id, true, 'получено ' + Math.round(b.byteLength / 1024) + ' КБ за ' + (Date.now() - started) + ' мс');
+        })
+        .catch(function () {
+          if (done) return; done = true; clearTimeout(timer);
+          setResult(t.id, false, 'обрыв после ' + (Date.now() - started) + ' мс');
+        });
+    }
+  }
+
+  TESTS.forEach(run);
+
+  function buildReport() {
+    if (reported) return;
+    reported = true;
+    var lines = ['Babeo, какие фото открываются', 'устройство: ' + navigator.userAgent, 'время: ' + new Date().toISOString(), ''];
+    TESTS.forEach(function (t) {
+      var r = results[t.id];
+      lines.push((r && r.ok ? 'ОК  ' : 'НЕТ ') + t.name + ' -> ' + (r ? r.text : 'нет данных'));
+    });
+    var okList = TESTS.filter(function (t) { return results[t.id] && results[t.id].ok; }).map(function (t) { return t.name; });
+    var bigOk = ['i36', 'k71', 'h141', 'p140'].filter(function (k) { return results[k] && results[k].ok; }).length;
+    var smallOk = ['i2', 's10', 'n11', 'k27'].filter(function (k) { return results[k] && results[k].ok; }).length;
+    lines.push('');
+    lines.push('маленькие файлы: ' + smallOk + ' из 4, крупные: ' + bigOk + ' из 4');
+    lines.push('открываются: ' + (okList.join(', ') || 'ничего'));
+    document.getElementById('report').textContent = lines.join('\n');
+  }
+
+  window.copyReport = function () {
+    var text = document.getElementById('report').textContent;
+    if (navigator.clipboard && navigator.clipboard.writeText) { try { navigator.clipboard.writeText(text); } catch (e) {} }
+    var btn = document.querySelector('button');
+    if (btn) btn.textContent = 'Нажмите и удерживайте текст ниже, чтобы скопировать';
+  };
+})();
+</script>
+</body>
+</html>
