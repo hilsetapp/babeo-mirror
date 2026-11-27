@@ -86,32 +86,67 @@
   SIZES.forEach(function (kb) {
     QUEUE.push({ src: 'https://babeo-app.ru/api/probe?kb=' + kb + '&p=' + Date.now(), id: 'ru-' + kb, label: 'Ваш домен: ' + kb + ' КБ' });
   });
-  var PHOTOS = [
-    ['SONY_XM5', 'Фото товара (10 КБ)'],
-    ['ICON_512', 'Иконка сайта (36 КБ)'],
-    ['HERO_VILLAGE', 'Крупное фото (141 КБ)']
-  ];
-  PHOTOS.forEach(function (item) {
-    QUEUE.push({ src: 'https://babeo-app.ru/api/assets/' + item[0] + '.webp?p=' + Date.now(), id: 'photo-' + item[0], label: item[1] });
-  });
+  function startPhotos() {
+    var PHOTOS = [
+      ['SONY_XM5', 'Фото товара (10 КБ)'],
+      ['ICON_512', 'Иконка сайта (36 КБ)'],
+      ['HERO_VILLAGE', 'Крупное фото (141 КБ)']
+    ];
+    PHOTOS.forEach(function (item) {
+      QUEUE.push({ src: 'https://babeo-app.ru/api/assets/' + item[0] + '.webp?p=' + Date.now(), id: 'photo-' + item[0], label: item[1] });
+    });
+  }
+
+  // проверка самой страницы сайта: ответ сервера и полная загрузка целиком
+  function probePage() {
+    var started = Date.now();
+    var finished = false;
+    var timer = setTimeout(function () {
+      if (finished) return;
+      finished = true;
+      results['page'] = { ok: false, ms: Date.now() - started };
+      update('page', 'обрыв, страница не ответила за 20 с', 'bad');
+      maybeReport(); startPhotos();
+    }, 20000);
+    fetch('https://babeo-app.ru/?probe=' + Date.now(), { mode: 'no-cors', cache: 'no-store' })
+      .then(function () {
+        if (finished) return;
+        finished = true; clearTimeout(timer);
+        var ms = Date.now() - started;
+        results['page'] = { ok: true, ms: ms };
+        update('page', 'сервер ответил за ' + ms + ' мс', 'ok');
+        maybeReport(); startPhotos();
+      })
+      .catch(function () {
+        if (finished) return;
+        finished = true; clearTimeout(timer);
+        var ms = Date.now() - started;
+        results['page'] = { ok: false, ms: ms };
+        update('page', 'соединение не установлено', 'bad');
+        maybeReport(); startPhotos();
+      });
+  }
+  cell('page', 'Главная страница сайта', 'запрашиваю…', '');
 
   // запускаем по одному: на нестабильном канале параллельные загрузки
   // мешают друг другу и дают ложные обрывы
   var qi = 0;
   function next() {
-    if (qi >= QUEUE.length) return;
+    if (qi >= QUEUE.length) { expected = 1 + QUEUE.length; if (doneCount >= expected) buildReport(); return; }
     var t = QUEUE[qi++];
     probe(t.src, t.id, t.label, next);
   }
 
-  var expected = QUEUE.length;
+  var expected = 1;
+  window.__queueAdded = false;
   var doneCount = 0;
   var reportBuilt = false;
 
-  next();
+  probePage();
 
   function maybeReport() {
     doneCount++;
+    expected = 1 + QUEUE.length;
     if (doneCount >= expected) buildReport();
   }
 
