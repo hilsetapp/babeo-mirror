@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>До какого размера проходит загрузка</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; background:#0B0F1F; color:#F5F6FA; font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; padding:16px 14px 40px; }
+  h1 { font-size:18px; margin:0 0 6px; }
+  .lead { color:#A9B2CC; font-size:13px; margin:0 0 16px; }
+  .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+  .cell { padding:11px 12px; border-radius:12px; background:#141A2E; border:1px solid rgba(255,255,255,.08); }
+  .name { font-size:13px; font-weight:600; }
+  .state { font-size:12px; color:#A9B2CC; margin-top:2px; }
+  .ok { border-color:rgba(52,211,153,.55); }
+  .bad { border-color:rgba(248,113,113,.55); }
+  .copy { margin-top:14px; padding:12px; border-radius:10px; background:#000; border:1px solid rgba(255,255,255,.15); font:12px/1.45 ui-monospace,Menlo,Consolas,monospace; white-space:pre-wrap; word-break:break-all; color:#93C5FD; }
+  button { margin-top:12px; width:100%; padding:14px; border-radius:12px; border:0; background:#4F46E5; color:#fff; font-size:15px; font-weight:700; }
+  .hint { margin-top:16px; padding:13px; border-radius:12px; background:#101728; border:1px solid rgba(255,255,255,.08); font-size:13px; color:#C9D1E6; }
+</style>
+</head>
+<body>
+<h1>До какого размера проходит загрузка</h1>
+<p class="lead">Сначала проверяется этот сайт, потом ваш домен. Это покажет, обрываются ли большие ответы только у вашего хостинга или у всей сети.</p>
+<div class="grid" id="grid"></div>
+<div class="hint">Через 20 секунд нажмите кнопку и пришлите отчёт. В нём будет важная строка «порог».</div>
+<button onclick="copyReport()">Скопировать отчёт</button>
+<div class="copy" id="report">проверка идёт…</div>
+
+<script>
+(function () {
+  var SIZES = [4, 8, 12, 20, 32, 48, 80, 140, 260, 500];
+  var results = {};
+
+  function cell(id, name, state, cls) {
+    var d = document.createElement('div');
+    d.className = 'cell ' + (cls || '');
+    d.id = 'cell-' + id;
+    d.innerHTML = '<div class="name">' + name + '</div><div class="state">' + state + '</div>';
+    document.getElementById('grid').appendChild(d);
+  }
+
+  function update(id, state, cls) {
+    var d = document.getElementById('cell-' + id);
+    if (!d) return;
+    d.className = 'cell ' + (cls || '');
+    d.querySelector('.state').textContent = state;
+  }
+
+  function probe(src, id, label) {
+    cell(id, label, 'качаю…', '');
+    var started = Date.now();
+    var finished = false;
+    var timer = setTimeout(function () {
+      if (finished) return;
+      finished = true;
+      results[id] = { ok: false, ms: Date.now() - started };
+      update(id, 'обрыв, нет ответа за 20 с', 'bad');
+      maybeReport();
+    }, 20000);
+    fetch(src, { cache: 'no-store' })
+      .then(function (r) { return r.arrayBuffer(); })
+      .then(function (buf) {
+        if (finished) return;
+        finished = true; clearTimeout(timer);
+        var ms = Date.now() - started;
+        results[id] = { ok: true, bytes: buf.byteLength, ms: ms };
+        update(id, 'полностью, ' + Math.round(buf.byteLength / 1024) + ' КБ за ' + ms + ' мс', 'ok');
+        maybeReport();
+      })
+      .catch(function () {
+        if (finished) return;
+        finished = true; clearTimeout(timer);
+        results[id] = { ok: false, ms: Date.now() - started };
+        update(id, 'обрыв соединения', 'bad');
+        maybeReport();
+      });
+  }
+
+  SIZES.forEach(function (kb) {
+    probe('probe/p' + kb + '.bin?p=' + Date.now() + '-' + kb, 'gh-' + kb, 'GitHub: ' + kb + ' КБ');
+  });
+  SIZES.forEach(function (kb) {
+    probe('https://babeo-app.ru/api/assets/HERO_VILLAGE.webp?pad=' + (kb * 3000), 'ru-' + kb, 'Ваш домен: ' + kb + ' КБ');
+  });
+
+  var expected = SIZES.length * 2;
+  var doneCount = 0;
+  var reportBuilt = false;
+
+  function maybeReport() {
+    doneCount++;
+    if (doneCount >= expected) buildReport();
+  }
+
+  function threshold(prefix) {
+    var lastOk = 0, firstBad = null;
+    SIZES.forEach(function (kb) {
+      var r = results[prefix + '-' + kb];
+      if (!r) return;
+      if (r.ok) lastOk = Math.max(lastOk, kb);
+      else if (firstBad === null) firstBad = kb;
+    });
+    return { lastOk: lastOk, firstBad: firstBad };
+  }
+
+  function buildReport() {
+    if (reportBuilt) return;
+    reportBuilt = true;
+    var gh = threshold('gh'), ru = threshold('ru');
+    var lines = ['Babeo, до какого размера проходит загрузка', 'устройство: ' + navigator.userAgent, 'время: ' + new Date().toISOString(), ''];
+    lines.push('GitHub: прошло до ' + gh.lastOk + ' КБ' + (gh.firstBad ? ', первый обрыв на ' + gh.firstBad + ' КБ' : ', обрывов нет'));
+    lines.push('Ваш домен: прошло до ' + ru.lastOk + ' КБ' + (ru.firstBad ? ', первый обрыв на ' + ru.firstBad + ' КБ' : ', обрывов нет'));
+    lines.push('порог: ' + Math.max(gh.lastOk, ru.lastOk) + ' КБ');
+    lines.push('');
+    SIZES.forEach(function (kb) {
+      var g = results['gh-' + kb], r = results['ru-' + kb];
+      lines.push(kb + ' КБ | GitHub: ' + (g && g.ok ? 'ок ' + g.ms + ' мс' : 'обрыв') + ' | ваш домен: ' + (r && r.ok ? 'ок ' + r.ms + ' мс' : 'обрыв'));
+    });
+    document.getElementById('report').textContent = lines.join('\n');
+  }
+
+  window.copyReport = function () {
+    buildReport();
+    var text = document.getElementById('report').textContent;
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text);
+    else { var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+    document.querySelector('button').textContent = 'Отчёт скопирован';
+  };
+})();
+</script>
+</body>
+</html>
