@@ -96,7 +96,21 @@
 
   function maybeReport() {
     doneCount++;
+    // отчёт пробуем собрать на каждом шаге, лишние вызовы отсекает reportBuilt
     if (doneCount >= expected) buildReport();
+    scheduleBuild();
+  }
+
+  // подстраховка: если счётчик по какой-то причине не совпал,
+  // отчёт всё равно соберётся через 3 секунды после последнего шага
+  var buildTimer = null;
+  function scheduleBuild() {
+    if (buildTimer) clearTimeout(buildTimer);
+    buildTimer = setTimeout(function () {
+      var states = [].slice.call(document.querySelectorAll('.cell .state')).map(function (x) { return x.textContent; });
+      var busy = states.filter(function (t) { return t.indexOf('качаю') > -1 || t.indexOf('запрашиваю') > -1; }).length;
+      if (!busy) buildReport();
+    }, 3000);
   }
 
   // по одному, чтобы на нестабильном канале загрузки не мешали друг другу
