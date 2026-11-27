@@ -49,7 +49,7 @@
     d.querySelector('.state').textContent = state;
   }
 
-  function probe(src, id, label) {
+  function probe(src, id, label, done) {
     cell(id, label, 'качаю…', '');
     var started = Date.now();
     var finished = false;
@@ -58,7 +58,7 @@
       finished = true;
       results[id] = { ok: false, ms: Date.now() - started };
       update(id, 'обрыв, нет ответа за 20 с', 'bad');
-      maybeReport();
+      maybeReport(); if (done) done();
     }, 20000);
     fetch(src, { cache: 'no-store' })
       .then(function (r) { return r.arrayBuffer(); })
@@ -68,36 +68,47 @@
         var ms = Date.now() - started;
         results[id] = { ok: true, bytes: buf.byteLength, ms: ms };
         update(id, 'полностью, ' + Math.round(buf.byteLength / 1024) + ' КБ за ' + ms + ' мс', 'ok');
-        maybeReport();
+        maybeReport(); if (done) done();
       })
       .catch(function () {
         if (finished) return;
         finished = true; clearTimeout(timer);
         results[id] = { ok: false, ms: Date.now() - started };
         update(id, 'обрыв соединения', 'bad');
-        maybeReport();
+        maybeReport(); if (done) done();
       });
   }
 
+  var QUEUE = [];
   SIZES.forEach(function (kb) {
-    probe('probe/p' + kb + '.bin?p=' + Date.now() + '-' + kb, 'gh-' + kb, 'GitHub: ' + kb + ' КБ');
+    QUEUE.push({ src: 'probe/p' + kb + '.bin?p=' + Date.now() + '-' + kb, id: 'gh-' + kb, label: 'GitHub: ' + kb + ' КБ' });
   });
   SIZES.forEach(function (kb) {
-    probe('https://babeo-app.ru/api/probe?kb=' + kb + '&p=' + Date.now(), 'ru-' + kb, 'Ваш домен: ' + kb + ' КБ');
+    QUEUE.push({ src: 'https://babeo-app.ru/api/probe?kb=' + kb + '&p=' + Date.now(), id: 'ru-' + kb, label: 'Ваш домен: ' + kb + ' КБ' });
   });
-  // отдельно проверяем реальные фото с сайта: именно они не открывались
   var PHOTOS = [
     ['SONY_XM5', 'Фото товара (10 КБ)'],
     ['ICON_512', 'Иконка сайта (36 КБ)'],
-    ['HERO_VILLAGE', 'Крупное фото (141 КБ)'],
+    ['HERO_VILLAGE', 'Крупное фото (141 КБ)']
   ];
   PHOTOS.forEach(function (item) {
-    probe('https://babeo-app.ru/api/assets/' + item[0] + '.webp?p=' + Date.now(), 'photo-' + item[0], item[1]);
+    QUEUE.push({ src: 'https://babeo-app.ru/api/assets/' + item[0] + '.webp?p=' + Date.now(), id: 'photo-' + item[0], label: item[1] });
   });
 
-  var expected = SIZES.length * 2 + 3;
+  // запускаем по одному: на нестабильном канале параллельные загрузки
+  // мешают друг другу и дают ложные обрывы
+  var qi = 0;
+  function next() {
+    if (qi >= QUEUE.length) return;
+    var t = QUEUE[qi++];
+    probe(t.src, t.id, t.label, next);
+  }
+
+  var expected = QUEUE.length;
   var doneCount = 0;
   var reportBuilt = false;
+
+  next();
 
   function maybeReport() {
     doneCount++;
