@@ -79,6 +79,24 @@
       return setAttr.call(this, name, value);
     };
   })();
+
+  // Простой режим: ?simple=1 убирает пузыри и тяжёлые эффекты.
+  // Нужен на слабых устройствах, где эффекты рисуются чёрными пятнами.
+  (function () {
+    try {
+      var q = String(location.search || '');
+      var root = document.documentElement;
+      if (q.indexOf('simple=1') > -1) {
+        root.classList.add('babeo-simple');
+        try { localStorage.setItem('babeo_simple_v1', '1'); } catch (e) {}
+      } else if (q.indexOf('simple=0') > -1) {
+        root.classList.remove('babeo-simple');
+        try { localStorage.removeItem('babeo_simple_v1'); } catch (e) {}
+      } else if (localStorage.getItem('babeo_simple_v1') === '1') {
+        root.classList.add('babeo-simple');
+      }
+    } catch (e) {}
+  })();
 </script>
 <script type="module">(function(){const t=document.createElement("link").relList;if(t&&t.supports&&t.supports("modulepreload"))return;for(const s of document.querySelectorAll('link[rel="modulepreload"]'))r(s);new MutationObserver(s=>{for(const i of s)if(i.type==="childList")for(const l of i.addedNodes)l.tagName==="LINK"&&l.rel==="modulepreload"&&r(l)}).observe(document,{childList:!0,subtree:!0});function n(s){const i={};return s.integrity&&(i.integrity=s.integrity),s.referrerPolicy&&(i.referrerPolicy=s.referrerPolicy),s.crossOrigin==="use-credentials"?i.credentials="include":s.crossOrigin==="anonymous"?i.credentials="omit":i.credentials="same-origin",i}function r(s){if(s.ep)return;s.ep=!0;const i=n(s);fetch(s.href,i)}})();function cp(e){return e&&e.__esModule&&Object.prototype.hasOwnProperty.call(e,"default")?e.default:e}var _c={exports:{}},Ri={},Ac={exports:{}},ve={};/**
  * @license React
