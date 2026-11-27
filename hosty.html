@@ -22,7 +22,7 @@
 </head>
 <body>
 <h1>Какие хостинги у вас открываются</h1>
-<p class="lead">Здесь проверяются картинки с разных серверов. Картинки не подчиняются правилам, которые мешали прошлой проверке, поэтому результат будет честным.</p>
+<p class="lead">Здесь браузер загружает обычные картинки с разных серверов. Картинки не подчиняются ограничениям, которые искажали прошлую проверку, поэтому результат честный. Тест крупного фото покажет ещё и скорость.</p>
 <div id="rows"></div>
 <div class="hint">Через 15 секунд нажмите кнопку и пришлите строку отчёта.</div>
 <button onclick="copyReport()">Скопировать отчёт</button>
@@ -32,15 +32,14 @@
 (function () {
   // каждый пункт: картинка с конкретного хостинга
   var TESTS = [
-    { id:'vercel',  name:'Vercel (там сейчас сайт)', url:'https://babeo-app-hilset.vercel.app/api/assets/SONY_XM5.webp?p=' + Date.now() },
-    { id:'domain',  name:'Ваш домен babeo-app.ru',   url:'https://babeo-app.ru/api/assets/SONY_XM5.webp?p=' + Date.now() },
-    { id:'github',  name:'GitHub (эта страница)',    url:'https://hilsetapp.github.io/babeo-mirror/assets/' + 'DYSON_AIRWRAP.jpg' + '?p=' + Date.now() },
-    { id:'cf',      name:'Cloudflare',               url:'https://www.cloudflare.com/favicon.ico?p=' + Date.now() },
-    { id:'netlify', name:'Netlify',                  url:'https://www.netlify.com/favicon.ico?p=' + Date.now() },
-    { id:'jsdelivr',name:'jsDelivr (быстрая сеть)',  url:'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/favicon.ico?p=' + Date.now() },
-    { id:'yandex',  name:'Яндекс',                   url:'https://yandex.ru/favicon.ico?p=' + Date.now() },
-    { id:'google',  name:'Google',                   url:'https://www.google.com/favicon.ico?p=' + Date.now() },
-    { id:'tg',      name:'Telegram',                 url:'https://telegram.org/favicon.ico?p=' + Date.now() }
+    { id:'domain-img', name:'Ваш домен: фото товара', url:'https://babeo-app.ru/api/assets/SONY_XM5.webp?p=' + Date.now() },
+    { id:'domain-icon', name:'Ваш домен: иконка сайта', url:'https://babeo-app.ru/icon.png?p=' + Date.now() },
+    { id:'domain-big', name:'Ваш домен: крупное фото', url:'https://babeo-app.ru/api/assets/HERO_VILLAGE.webp?p=' + Date.now() },
+    { id:'github', name:'GitHub (эта страница)', url:'https://hilsetapp.github.io/babeo-mirror/assets/DYSON_AIRWRAP.jpg?p=' + Date.now() },
+    { id:'cf', name:'Cloudflare', url:'https://www.cloudflare.com/favicon.ico?p=' + Date.now() },
+    { id:'netlify', name:'Netlify', url:'https://www.netlify.com/favicon.ico?p=' + Date.now() },
+    { id:'yandex', name:'Яндекс', url:'https://yandex.ru/favicon.ico?p=' + Date.now() },
+    { id:'tg', name:'Telegram', url:'https://telegram.org/favicon.ico?p=' + Date.now() }
   ];
 
   var results = {}, settled = 0;
